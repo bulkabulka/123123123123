@@ -1,348 +1,495 @@
-<!DOCTYPE html>
-<html lang="pl">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bulka Casino | Ultimate Gaming Platform</title>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;900&display=swap" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
-</head>
-<body>
+// --- АУДИО ДВИЖОК ---
+const sfx = {
+    spin: new Audio('https://assets.mixkit.co/active_storage/sfx/2019/2019-audio.wav'),
+    win: new Audio('https://assets.mixkit.co/active_storage/sfx/2000/2000-audio.wav'),
+    lose: new Audio('https://assets.mixkit.co/active_storage/sfx/3148/3148-audio.wav'),
+    card: new Audio('https://assets.mixkit.co/active_storage/sfx/3005/3005-audio.wav'),
+    
+    play(soundName) {
+        let sound = this[soundName].cloneNode();
+        sound.volume = 0.4;
+        sound.play().catch(e => console.log("Sound locked until user interaction"));
+    }
+};
 
-    <div id="preloader" class="preloader-overlay">
-        <div class="loader-content">
-            <i class="fas fa-meteor loader-icon"></i>
-            <h2>Inicjalizacja Systemu...</h2>
-            <div class="progress-bar">
-                <div class="progress-fill" id="loading-progress"></div>
-            </div>
-            <p>Ładowanie zasobów kasyna (3+)</p>
-        </div>
-    </div>
+// --- ГЛАВНЫЙ КОНТРОЛЛЕР ---
+const app = {
+    balance: 0,
+    user: '',
+    
+    // Наша "База Данных"
+    validUsers: {
+        "vlad": { name: "Vlad Kelman", pass: "123123", startBalance: 5000, role: "Admin" },
+        "margo":  { name: "Menja zawut Margo", pass: "margo123", startBalance: 5000, role: "Admin" },
+        "roman": { name: "Roman", pass: "3,14159", startBalance: 5000, role: "Nauczyciel" },
+        "seba": { name: "Sebastian", pass: "seba123", startBalance: 500000, role: "VIP Tester" }
+    },
 
-    <div id="auth-modal" class="modal-overlay">
-        <div class="modal-box auth-box">
-            <div class="auth-tabs">
-                <button class="tab-btn active">Logowanie</button>
-                <button class="tab-btn">Rejestracja</button>
-            </div>
-            <div class="auth-form">
-                <i class="fas fa-user-astronaut auth-avatar"></i>
-                <h3>Witaj w Bulka Pro</h3>
-                <div class="input-group">
-                    <i class="fas fa-at"></i>
-                    <input type="text" id="login-name" placeholder="Twój Pseudonim lub Email">
-                </div>
-                <div class="input-group">
-                    <i class="fas fa-lock"></i>
-                    <input type="password" id="login-pass" placeholder="Hasło (opcjonalnie do testów)">
-                </div>
-                <button onclick="app.login()" class="btn-mega-glow">Wejdź do Gry <i class="fas fa-arrow-right"></i></button>
-            </div>
-        </div>
-    </div>
+    // Рабочие промокоды
+    promoCodes: {
+        "START1000": { amount: 1000, used: false },
+        "BULKA_VIP": { amount: 5000, used: false }
+    },
 
-    <div id="toast-container" class="toast-container"></div>
+    init() {
+        setTimeout(() => {
+            const progress = document.getElementById('loading-progress');
+            progress.style.width = '100%';
+            setTimeout(() => {
+                document.getElementById('preloader').style.opacity = '0';
+                setTimeout(() => document.getElementById('preloader').style.display = 'none', 500);
+            }, 500);
+        }, 1000);
+    },
 
-    <div id="deposit-modal" class="modal-overlay" style="display: none;">
-        <div class="modal-box deposit-box">
-            <button class="close-btn" onclick="app.closeDepositModal()"><i class="fas fa-times"></i></button>
-            <h3 style="margin-bottom: 20px;">Zasilenie Konta</h3>
-            
-            <div class="deposit-methods">
-                <button class="method-btn active" id="method-blik" onclick="app.selectPayment('blik')">
-                    <span style="font-weight: 900; letter-spacing: 1px;">BLIK</span>
-                </button>
-                <button class="method-btn" id="method-card" onclick="app.selectPayment('card')">
-                    <i class="fas fa-credit-card"></i> Karta
-                </button>
-            </div>
-
-            <div class="input-group">
-                <i class="fas fa-dollar-sign"></i>
-                <input type="number" id="deposit-amount" placeholder="Kwota (min. 50 USD)" min="50">
-            </div>
-
-            <div id="payment-details-blik" class="input-group">
-                <i class="fas fa-mobile-alt"></i>
-                <input type="text" id="blik-code" placeholder="Kod BLIK (6 cyfr)" maxlength="6">
-            </div>
-            
-            <div id="payment-details-card" class="input-group" style="display: none;">
-                <i class="fas fa-credit-card"></i>
-                <input type="text" id="card-number" placeholder="Numer karty (16 cyfr)" maxlength="19">
-            </div>
-
-            <div class="input-group" style="margin-top: 15px;">
-                <i class="fas fa-ticket-alt"></i>
-                <input type="text" id="deposit-promo" placeholder="Kod promocyjny (np. DAVID)">
-            </div>
-
-            <button onclick="app.processDeposit()" id="btn-process-pay" class="btn-mega-glow" style="margin-top: 20px;">Zapłać i Graj</button>
-        </div>
-    </div>
-
-    <div id="app-interface" class="main-wrapper" style="display: none;">
+    login() {
+        const input = document.getElementById('login-name').value.toLowerCase().trim();
+        const passInput = document.getElementById('login-pass').value;
         
-        <aside class="sidebar">
-            <div class="brand-header">
-                <div class="brand-logo">
-                    <i class="fas fa-dice-d20"></i> BULKA<span>PRO</span>
-                </div>
-                <div class="vip-badge">Level: <span id="vip-level">Bronze</span></div>
-            </div>
-
-            <div class="scrollable-menu">
-                <p class="menu-label">GŁÓWNE MENU</p>
-                <nav class="nav-menu">
-                    <button onclick="app.showTab('lobby')" class="nav-btn active" id="btn-lobby">
-                        <i class="fas fa-compass"></i> Odkrywaj
-                    </button>
-                    <button onclick="app.showTab('slots')" class="nav-btn" id="btn-slots">
-                        <i class="fas fa-slot-machine"></i> Automaty 3D
-                    </button>
-                    <button onclick="app.showTab('blackjack')" class="nav-btn" id="btn-blackjack">
-                        <i class="fas fa-spade"></i> Blackjack Pro
-                    </button>
-                    <button onclick="app.showTab('tournaments')" class="nav-btn" id="btn-tournaments">
-                        <i class="fas fa-trophy"></i> Turnieje
-                    </button>
-                    <button onclick="app.showTab('profile')" class="nav-btn" id="btn-profile">
-                        <i class="fas fa-user"></i> Mój Profil
-                    </button>
-                </nav>
-
-                <p class="menu-label">KONTO I WSPARCIE</p>
-                <nav class="nav-menu secondary-menu">
-                    <button onclick="app.openDepositModal()" class="nav-btn"><i class="fas fa-wallet"></i> Portfel i wpłaty</button>
-                    <button onclick="app.mockFeature('Bonusy i Promocje')" class="nav-btn"><i class="fas fa-gift"></i> Bonusy i Promocje</button>
-                    <button onclick="app.mockFeature('Wsparcie 24/7 (Live Chat)')" class="nav-btn"><i class="fas fa-headset"></i> Wsparcie 24/7</button>
-                </nav>
-            </div>
-
-            <div class="user-footer">
-                <img src="https://play-lh.googleusercontent.com/1dYQJY5pByM-uZH42tNh1LRN6bJfZbjhOg6pVudngG742iueR2KOIg3EC4Rc2b_VxoI" alt="Avatar" class="avatar-sm">
-                <div class="user-details">
-                    <span id="display-username">User</span>
-                    <small>Online</small>
-                </div>
-                <button onclick="app.logout()" class="btn-icon" title="Wyloguj"><i class="fas fa-sign-out-alt"></i></button>
-            </div>
-        </aside>
-
-        <main class="viewport">
+        if(this.validUsers[input]) {
+            const userData = this.validUsers[input];
             
-            <header class="top-navbar">
-                <div class="search-widget">
-                    <i class="fas fa-search"></i>
-                    <input type="text" placeholder="Szukaj ulubionych gier (np. Cyberpunk Slots)...">
-                </div>
+            if(passInput === userData.pass) {
+                this.user = userData.name;
                 
-                <div class="nav-actions">
-                    <button onclick="app.mockFeature('Powiadomienia')" class="btn-icon notify-btn">
-                        <i class="fas fa-bell"></i><span class="badge">3</span>
-                    </button>
-                    <div class="balance-display">
-                        <div class="balance-labels">
-                            <small>Saldo Główne</small>
-                            <div class="amount"><span id="balance-val">1000</span> <span class="currency">USD</span></div>
-                        </div>
-                        <button class="btn-deposit" onclick="app.openDepositModal()"><i class="fas fa-plus"></i> Wpłać</button>
-                    </div>
-                </div>
-            </header>
+                const savedBalance = localStorage.getItem(`balance_${input}`);
+                this.balance = savedBalance ? parseInt(savedBalance) : userData.startBalance;
 
-            <div class="live-ticker">
-                <div class="ticker-label"><i class="fas fa-bolt"></i> Na żywo:</div>
-                <marquee behavior="scroll" direction="left" scrollamount="5">
-                    <span class="winner-item">Gracz <b>Margo***</b> wygrał 1500$ w Classic 777!</span>
-                    <span class="winner-item">Gracz <b>Kamil99</b> trafił Jackpot (5000$)!</span>
-                    <span class="winner-item">Gracz <b>Vlad***</b> dołączył do turnieju.</span>
-                </marquee>
-            </div>
-
-            <div class="tabs-container">
+                document.getElementById('auth-modal').style.display = 'none';
+                document.getElementById('app-interface').style.display = 'flex';
                 
-                <section id="tab-lobby" class="content-tab">
-                    <div class="hero-slider">
-                        <div class="slide slide-active">
-                            <div class="slide-content">
-                                <span class="promo-tag">Tylko dzisiaj!</span>
-                                <h1>!!!Zgarnij Bonus Powitalny 7777 USD!!!</h1>
-                                <p>Odbierz 7777 USD na naszej stronie!</p>
-                                <button onclick="app.claimBonus()" class="btn-slide-action">Odbierz Bonus</button>
-                            </div>
-                            <div class="slide-gfx"></div>
-                        </div>
-                    </div>
+                document.getElementById('display-username').innerText = this.user;
+                document.getElementById('tourney-username').innerText = this.user;
+                document.getElementById('vip-level').innerText = userData.role;
+                document.getElementById('profile-role').innerText = userData.role;
+                
+                this.updateUI();
+                games.slots.loadType('classic');
+                this.notify(`Autoryzacja udana! Witaj, ${this.user}`);
+            } else {
+                this.notify("Błąd: Nieprawidłowe hasło!", "error");
+            }
+        } else {
+            this.notify("Błąd: Nieznany login. Odmowa dostępu.", "error");
+        }
+    },
 
-                    <div class="section-title">
-                        <h3>🔥 Gorące Gry</h3>
-                        <button class="btn-text">Zobacz wszystkie <i class="fas fa-chevron-right"></i></button>
-                    </div>
-                    
-                    <div class="game-showcase-grid">
-                        <div class="game-poster" onclick="app.launchGame('slots', 'cyber')">
-                            <div class="poster-img" style="background-image: url('https://images.unsplash.com/photo-1596838132731-3301c3fd4317');">
-                                <div class="overlay-play"><i class="fas fa-play-circle"></i></div>
-                            </div>
-                            <div class="poster-info">
-                                <h4>Cyber Neon</h4>
-                                <p>Automaty • Wypłata 96%</p>
-                            </div>
-                        </div>
-                        
-                        <div class="game-poster" onclick="app.showTab('blackjack')">
-                            <div class="poster-img" style="background-image: url('https://images.unsplash.com/photo-1511193311914-0346f16efe90');">
-                                <div class="overlay-play"><i class="fas fa-play-circle"></i></div>
-                            </div>
-                            <div class="poster-info">
-                                <h4>Blackjack Pro</h4>
-                                <p>Karty • Klasyczna Gra</p>
-                            </div>
-                        </div>
-                    </div>
-                </section>
+    // --- НОВАЯ СИСТЕМА ДЕПОЗИТА ---
+    openDepositModal() {
+        document.getElementById('deposit-modal').style.display = 'flex';
+    },
 
-                <section id="tab-slots" class="content-tab" style="display:none;">
-                    <div class="slot-dashboard">
-                        <div class="slot-sidebar">
-                            <h3>Wybierz Maszynę</h3>
-                            <button onclick="games.slots.loadType('classic')" class="btn-slot-type active" id="type-classic">🍒 Classic 777</button>
-                            <button onclick="games.slots.loadType('cyber')" class="btn-slot-type" id="type-cyber">👾 Cyber Neon</button>
-                            <button onclick="games.slots.loadType('mystic')" class="btn-slot-type" id="type-mystic">🔮 Dark Magic</button>
-                            
-                            <div class="jackpot-widget">
-                                <p>Aktualny Jackpot</p>
-                                <h4>$ 124,580.99</h4>
-                            </div>
-                        </div>
+    closeDepositModal() {
+        document.getElementById('deposit-modal').style.display = 'none';
+        // Очищаем поля при закрытии
+        document.getElementById('deposit-amount').value = '';
+        document.getElementById('blik-code').value = '';
+        document.getElementById('card-number').value = '';
+        document.getElementById('deposit-promo').value = '';
+    },
 
-                        <div class="slot-main-area">
-                            <div class="machine-body theme-classic" id="machine-container">
-                                <h2 id="slot-title">Classic 777</h2>
-                                <div class="reels-frame">
-                                    <div class="reels-container">
-                                        <div class="reel" id="reel-1">🍒</div>
-                                        <div class="reel" id="reel-2">🍒</div>
-                                        <div class="reel" id="reel-3">🍒</div>
-                                    </div>
-                                    <div class="win-line"></div>
-                                </div>
-                                
-                                <div class="machine-controls-advanced">
-                                    <div class="control-group">
-                                        <label>ZAKŁAD</label>
-                                        <div class="bet-stepper">
-                                            <button onclick="document.getElementById('slot-bet').stepDown()">-</button>
-                                            <input type="number" id="slot-bet" value="50" min="10" step="10">
-                                            <button onclick="document.getElementById('slot-bet').stepUp()">+</button>
-                                        </div>
-                                    </div>
-                                    
-                                    <button onclick="games.slots.spin()" id="spin-btn" class="btn-spin-master">
-                                        <div class="spin-ring"></div>
-                                        <span>ZAKRĘĆ</span>
-                                    </button>
-                                    
-                                    <div class="control-group">
-                                        <label>AUTO PLAY</label>
-                                        <button onclick="app.toggleAuto()" class="btn-auto"><i class="fas fa-sync-alt"></i></button>
-                                    </div>
-                                </div>
-                                <div id="slot-msg" class="game-status-display">System gotowy do gry!</div>
-                            </div>
-                        </div>
-                    </div>
-                </section>
+    selectPayment(method) {
+        document.querySelectorAll('.method-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById(`method-${method}`).classList.add('active');
+        
+        if(method === 'blik') {
+            document.getElementById('payment-details-blik').style.display = 'flex';
+            document.getElementById('payment-details-card').style.display = 'none';
+        } else {
+            document.getElementById('payment-details-blik').style.display = 'none';
+            document.getElementById('payment-details-card').style.display = 'flex';
+        }
+    },
 
-                <section id="tab-blackjack" class="content-tab" style="display:none;">
-                    <div class="premium-table-wrapper">
-                        <div class="bj-table">
-                            <div class="dealer-side">
-                                <div class="player-tag">Krupier (AI) <span class="score-badge" id="dealer-score">?</span></div>
-                                <div id="dealer-cards" class="cards-row"></div>
-                            </div>
-                            
-                            <div class="table-center-logo"><i class="fas fa-crown"></i></div>
-                            
-                            <div class="player-side">
-                                <div id="player-cards" class="cards-row"></div>
-                                <div class="player-tag">Ty <span class="score-badge" id="player-score">0</span></div>
-                            </div>
-                            
-                            <div class="bj-action-panel">
-                                <button onclick="games.bj.start()" id="bj-start" class="btn-bj-primary">Nowa Gra (100$)</button>
-                                <button onclick="games.bj.hit()" id="bj-hit" class="btn-bj-action" disabled>+ Dobrać (Hit)</button>
-                                <button onclick="games.bj.stand()" id="bj-stand" class="btn-bj-action" disabled><i class="fas fa-hand-paper"></i> Czekać (Stand)</button>
-                            </div>
-                        </div>
-                    </div>
-                </section>
+    processDeposit() {
+        const amount = parseInt(document.getElementById('deposit-amount').value);
+        const promo = document.getElementById('deposit-promo').value.toUpperCase().trim();
 
-                <section id="tab-tournaments" class="content-tab" style="display:none;">
-                    <div class="tournament-header">
-                        <h2>🏆 Mistrzostwa Jesieni 2026</h2>
-                        <p>Graj w automaty i wspinaj się w rankingu, aby wygrać część z puli 10,000$!</p>
-                    </div>
-                    <table class="leaderboard-table">
-                        <thead>
-                            <tr>
-                                <th>Miejsce</th>
-                                <th>Gracz</th>
-                                <th>Punkty</th>
-                                <th>Nagroda</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr class="rank-1"><td>1 <i class="fas fa-medal" style="color: gold;"></i></td><td>Alex_Pro</td><td>15,420</td><td>$5,000</td></tr>
-                            <tr class="rank-2"><td>2 <i class="fas fa-medal" style="color: silver;"></i></td><td>Margo_R</td><td>12,300</td><td>$2,500</td></tr>
-                            <tr class="rank-3"><td>3 <i class="fas fa-medal" style="color: #cd7f32;"></i></td><td>NightRider</td><td>9,850</td><td>$1,000</td></tr>
-                            <tr><td>4</td><td>Twoja_Stara_Gra</td><td>8,100</td><td>$500</td></tr>
-                            <tr class="current-user-row"><td>42</td><td><span id="tourney-username">User</span> (Ty)</td><td>150</td><td>-</td></tr>
-                        </tbody>
-                    </table>
-                </section>
+        // 1. Пасхалка ДАВИДА
+        if(promo === "DAVID" || promo === "ДАВИД") {
+            const sidebar = document.querySelector('.slot-sidebar'); 
+            if(sidebar && !document.getElementById('type-dew')) {
+                const jackpot = document.querySelector('.jackpot-widget');
+                const btnHtml = `<button onclick="games.slots.loadType('dew')" class="btn-slot-type" id="type-dew" style="color: #00ff00; border-color: #00ff00; text-shadow: 0 0 5px #00ff00;">🥫 Dew Fortune</button>`;
+                if (jackpot) jackpot.insertAdjacentHTML('beforebegin', btnHtml);
+                else sidebar.insertAdjacentHTML('beforeend', btnHtml);
+            }
+            this.notify("Znalazłeś Easter Egg: Odblokowano ukryty automat!", "success");
+            this.closeDepositModal();
+            this.showTab('slots');
+            games.slots.loadType('dew');
+            return; 
+        }
 
-                <section id="tab-profile" class="content-tab" style="display:none;">
-                    <div class="tournament-header">
-                        <h2 style="color: #00f2fe;">Twoje Centrum Dowodzenia</h2>
-                        <p>Tutaj znajdziesz wszystkie informacje o swoim koncie i statystykach.</p>
-                    </div>
-                    <div class="slot-dashboard" style="display: flex; gap: 20px;">
-                        <div class="slot-sidebar" style="flex: 1; text-align: center;">
-                            <i class="fas fa-user-astronaut" style="font-size: 80px; color: var(--neon-pink); margin-bottom: 20px;"></i>
-                            <h3 id="profile-name">Gracz</h3>
-                            <p style="color: #888;">Status: Aktywny</p>
-                            <button class="btn-bj-primary" style="margin-top: 20px; width: 100%;" onclick="app.openDepositModal()">Zasil Konto</button>
-                        </div>
-                        <div class="machine-body" style="flex: 2; text-align: left;">
-                            <h3 style="margin-bottom: 20px; border-bottom: 1px solid #333; padding-bottom: 10px;">Statystyki Konta</h3>
-                            <p><strong>Całkowite saldo:</strong> <span id="profile-balance" style="color: var(--cyan);">0</span> USD</p>
-                            <p><strong>Poziom wierności:</strong> <span id="profile-role">VIP Tester</span></p>
-                            <p><strong>Ulubiona gra:</strong> Classic 777</p>
-                            <p><strong>Data rejestracji:</strong> Dzisiaj</p>
-                        </div>
-                    </div>
-                </section>
+        // 2. Пасхалка MOHEB
+        if(promo === "MOHEB" || promo === "МОХЕБ") {
+            const sidebar = document.querySelector('.slot-sidebar'); 
+            if(sidebar && !document.getElementById('type-moheb')) {
+                const jackpot = document.querySelector('.jackpot-widget');
+                const btnHtml = `<button onclick="games.slots.loadType('moheb')" class="btn-slot-type" id="type-moheb" style="color: #d4af37; border-color: #d4af37; text-shadow: 0 0 5px #d4af37;">🏎️ Moheb mode</button>`;
+                if (jackpot) jackpot.insertAdjacentHTML('beforebegin', btnHtml);
+                else sidebar.insertAdjacentHTML('beforeend', btnHtml);
+            }
+            this.notify("Tryb MOHEB! Niemiecka motoryzacja przejmuje kontrolę.", "success");
+            this.closeDepositModal();
+            this.showTab('slots');
+            games.slots.loadType('moheb');
+            return; 
+        }
 
-            </div>
+        // 3. Валидация суммы (Минимум 50 USD)
+        if(isNaN(amount) || amount < 50) {
+            return this.notify("Błąd: Minimalna kwota wpłaty to 50 USD.", "error");
+        }
+
+        // 4. Обработка обычных промокодов
+        let finalAmount = amount;
+        if(promo) {
+            if(this.promoCodes[promo]) {
+                if(!this.promoCodes[promo].used) {
+                    finalAmount += this.promoCodes[promo].amount;
+                    this.promoCodes[promo].used = true;
+                    this.notify(`Zastosowano kod! Dodatkowe $${this.promoCodes[promo].amount} w drodze.`, "success");
+                } else {
+                    return this.notify("Błąd: Ten kod promocyjny został już użyty.", "error");
+                }
+            } else {
+                return this.notify("Błąd: Nieprawidłowy kod promocyjny.", "error");
+            }
+        }
+
+        // 5. Имитация обработки банком
+        const btn = document.getElementById('btn-process-pay');
+        const originalText = btn.innerHTML;
+        btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Przetwarzanie...`;
+        btn.disabled = true;
+
+        setTimeout(() => {
+            this.balance += finalAmount;
+            this.updateUI();
+            this.notify(`Sukces! Saldo zostało zasilone kwotą $${finalAmount}.`, "success");
+            this.closeDepositModal();
             
-            <footer class="app-footer">
-                <p>Gra stworzona w celach edukacyjnych (Projekt Szkolny). Hazard wiąże się z ryzykiem.</p>
-                <div class="footer-links">
-                    <span>Regulaminu niema</span> | <span>Odpowiedzialna Gra (3+)</span> | <span>Polityki Prywatności też niema</span>
-                </div>
-            </footer>
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        }, 1500);
+    },
+
+    showTab(id) {
+        document.querySelectorAll('.content-tab').forEach(t => t.style.display = 'none');
+        document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById(`tab-${id}`).style.display = 'block';
+        document.getElementById(`btn-${id}`).classList.add('active');
+    },
+
+    launchGame(tabId, gameType = null) {
+        this.showTab(tabId); 
+        if (tabId === 'slots' && gameType) {
+            games.slots.loadType(gameType);
+        }
+    },
+
+    logout() { location.reload(); },
+
+    notify(message, type = "success") {
+        const container = document.getElementById('toast-container');
+        const toast = document.createElement('div');
+        toast.className = 'toast';
+        toast.style.borderLeftColor = type === 'error' ? '#ff3333' : '#00f2fe';
+        toast.innerHTML = `<i class="fas ${type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle'}"></i> ${message}`;
+        container.appendChild(toast);
+        setTimeout(() => toast.remove(), 4000);
+    },
+
+    mockFeature(featureName) {
+        this.notify(`Moduł "${featureName}" jest obecnie niedostępny w wersji demonstracyjnej.`, "error");
+    },
+
+    claimBonus() {
+        const bonusClaimed = localStorage.getItem(`bonus_${this.user}`);
+        if(bonusClaimed) {
+            this.notify("Już odebrałeś swój bonus powitalny!", "error");
+        } else {
+            this.balance += 7777;
+            localStorage.setItem(`bonus_${this.user}`, "true");
+            this.updateUI();
+            this.notify("Sukces! Dodano 7777$ bonusu powitalnego do twojego salda.", "success");
+        }
+    },
+
+    toggleAuto() {
+        this.notify("Tryb Auto-Spin został aktywowany. (Funkcja VIP)", "success");
+    },
+
+    updateUI() {
+        document.getElementById('balance-val').innerText = this.balance.toLocaleString();
+        
+        const profileBalance = document.getElementById('profile-balance');
+        if(profileBalance) profileBalance.innerText = this.balance.toLocaleString();
+        
+        const profileName = document.getElementById('profile-name');
+        if(profileName) profileName.innerText = this.user;
+        
+        const currentLogin = document.getElementById('login-name').value.toLowerCase().trim();
+        localStorage.setItem(`balance_${currentLogin}`, this.balance);
+    }
+};
+
+// --- ИГРОВЫЕ МОДУЛИ ---
+const games = {
+    // 1. СИСТЕМА СЛОТОВ
+    slots: {
+        types: {
+            classic: { name: "Classic 777", symbols: ['🍒', '🍋', '🔔', '💎', '7️⃣'], themeClass: 'theme-classic', jackpot: '7️⃣', mult: 20 },
+            cyber: { name: "Cyber Neon", symbols: ['🤖', '👾', '🔋', '🚀', '🌌'], themeClass: 'theme-cyber', jackpot: '🚀', mult: 30 },
+            mystic: { name: "Dark Magic", symbols: ['👁️', '🔮', '🌙', '💀', '🧛'], themeClass: 'theme-mystic', jackpot: '🔮', mult: 50 },
+            dew: { 
+                name: "David's Mountain Dew", 
+                symbols: ['<img src="dew.png" class="slot-icon">'], 
+                themeClass: 'theme-dew', 
+                jackpot: '<img src="dew.png" class="slot-icon">', 
+                mult: 5 
+            },
+            moheb: { 
+                name: "Dark Moheb Mode", 
+                symbols: [
+                    '<img src="https://cdn11.bigcommerce.com/s-ydriczk/images/stencil/1500x1500/products/88784/92305/Jin-from-BTS-K-Pop-face-mask-available-now-at-starstills__93277.1548765854.jpg?c=2" class="car-logo">',
+                    '<img src="https://m.media-amazon.com/images/I/71MJ+wF4yXL._AC_UF1000,1000_QL80_.jpg" class="car-logo">',
+                    '<img src="https://i.pinimg.com/564x/c3/dd/7e/c3dd7e75aecbcce93f9ba9da4ece817f.jpg" class="car-logo">'
+                ], 
+                themeClass: 'theme-moheb', 
+                jackpot: '<img src="https://upload.wikimedia.org/wikipedia/commons/9/92/Audi-Logo_2016.svg" class="car-logo">', 
+                mult: 10 
+            }
+        },
+        currentType: 'classic',
+        isSpinning: false,
+
+        loadType(typeKey) {
+            if(this.isSpinning) return;
+            this.currentType = typeKey;
+            const cfg = this.types[typeKey];
+
+            // Магия с темным дубом для Мохеба
+            if(typeKey === 'moheb') {
+                document.body.classList.add('dark-oak-bg');
+            } else {
+                document.body.classList.remove('dark-oak-bg');
+            }
+
+            document.querySelectorAll('.btn-slot-type').forEach(b => b.classList.remove('active'));
+            const typeBtn = document.getElementById(`type-${typeKey}`);
+            if(typeBtn) typeBtn.classList.add('active');
+
+            const container = document.getElementById('machine-container');
+            container.className = `machine-body ${cfg.themeClass}`;
+            document.getElementById('slot-title').innerText = cfg.name;
             
-        </main>
-    </div>
+            document.getElementById('reel-1').innerHTML = cfg.symbols[Math.floor(Math.random() * cfg.symbols.length)];
+            document.getElementById('reel-2').innerHTML = cfg.symbols[Math.floor(Math.random() * cfg.symbols.length)];
+            document.getElementById('reel-3').innerHTML = cfg.symbols[Math.floor(Math.random() * cfg.symbols.length)];
+            
+            document.getElementById('slot-msg').innerText = "System gotowy do gry!";
+            document.getElementById('slot-msg').style.color = "#fff";
+        },
 
-    <div class="floating-chat-btn" onclick="app.mockFeature('Live Chat')">
-        <i class="fas fa-comments"></i>
-    </div>
+        spin() {
+            if(this.isSpinning) return;
+            const bet = parseInt(document.getElementById('slot-bet').value);
+            if(bet > app.balance || bet < 10) return app.notify("Brak środków lub zła stawka!", "error");
 
-    <script src="script.js"></script>
-</body>
-</html>
+            this.isSpinning = true;
+            app.balance -= bet;
+            app.updateUI();
+            
+            const cfg = this.types[this.currentType];
+            const reels = [document.getElementById('reel-1'), document.getElementById('reel-2'), document.getElementById('reel-3')];
+            reels.forEach(r => r.classList.add('spinning'));
+
+            let count = 0;
+            sfx.play('spin');
+
+            const timer = setInterval(() => {
+                reels.forEach(r => r.innerHTML = cfg.symbols[Math.floor(Math.random() * cfg.symbols.length)]);
+                count++;
+                
+                if(count > 25) {
+                    clearInterval(timer);
+                    reels.forEach(r => r.classList.remove('spinning'));
+                    this.checkResult(bet, cfg);
+                }
+            }, 60);
+        },
+
+        checkResult(bet, cfg) {
+            const r = [document.getElementById('reel-1').innerHTML, document.getElementById('reel-2').innerHTML, document.getElementById('reel-3').innerHTML];
+            let win = 0;
+            const msg = document.getElementById('slot-msg');
+
+            if(r[0] === r[1] && r[1] === r[2]) {
+                win = r[0] === cfg.jackpot ? bet * cfg.mult : bet * 5;
+                msg.innerHTML = `🔥 JACKPOT: +$${win} 🔥`;
+                msg.style.color = "#00ff00";
+                sfx.play('win');
+                app.notify(`Niesamowite! Wygrałeś $${win} w automatach!`);
+            } 
+            else if(r[0] === r[1] || r[1] === r[2] || r[0] === r[2]) {
+                win = Math.floor(bet * 1.5);
+                msg.innerText = `Wygrana: +$${win}`;
+                msg.style.color = "#00f2fe";
+                sfx.play('win');
+            } 
+            else {
+                msg.innerText = "Brak wygranej. Spróbuj ponownie.";
+                msg.style.color = "#888";
+                sfx.play('lose');
+            }
+            
+            app.balance += win;
+            this.isSpinning = false;
+            app.updateUI();
+        }
+    },
+
+    // 2. ПРОДВИНУТЫЙ БЛЭКДЖЕК
+    bj: {
+        suits: ['♥', '♦', '♣', '♠'],
+        values: ['2','3','4','5','6','7','8','9','10','J','Q','K','A'],
+        deck: [], pCards: [], dCards: [],
+        pScore: 0, dScore: 0, state: 'idle', bet: 0,
+
+        buildDeck() {
+            this.deck = [];
+            for(let s of this.suits) {
+                for(let v of this.values) {
+                    let weight = parseInt(v);
+                    if(v === 'J' || v === 'Q' || v === 'K') weight = 10;
+                    if(v === 'A') weight = 11;
+                    this.deck.push({ suit: s, value: v, weight: weight, color: (s==='♥'||s==='♦') ? 'card-red' : 'card-black' });
+                }
+            }
+            this.deck.sort(() => Math.random() - 0.5);
+        },
+
+        drawCard() { return this.deck.pop(); },
+
+        calcScore(cards) {
+            let score = 0; let aces = 0;
+            cards.forEach(c => { score += c.weight; if(c.value === 'A') aces++; });
+            while(score > 21 && aces > 0) { score -= 10; aces--; } 
+            return score;
+        },
+
+        renderCard(card, hidden = false) {
+            if(hidden) return `<div class="bj-card card-hidden"></div>`;
+            return `
+                <div class="bj-card ${card.color}">
+                    <div class="card-top">${card.value}</div>
+                    <div class="card-center">${card.suit}</div>
+                    <div class="card-bottom">${card.value}</div>
+                </div>`;
+        },
+
+        start() {
+            if(app.balance < 100) return app.notify("Min. zakład to 100$!", "error");
+            this.bet = 100;
+            app.balance -= this.bet;
+            app.updateUI();
+            
+            this.buildDeck();
+            this.state = 'playing';
+            
+            this.pCards = [this.drawCard(), this.drawCard()];
+            this.dCards = [this.drawCard(), this.drawCard()]; 
+            sfx.play('card');
+
+            this.updateBoard();
+            this.toggleBtns(true);
+
+            if(this.calcScore(this.pCards) === 21) {
+                this.stand(); 
+            }
+        },
+
+        updateBoard(revealDealer = false) {
+            this.pScore = this.calcScore(this.pCards);
+            
+            let pHTML = this.pCards.map(c => this.renderCard(c)).join('');
+            document.getElementById('player-cards').innerHTML = pHTML;
+            document.getElementById('player-score').innerText = this.pScore;
+
+            let dHTML = '';
+            if(revealDealer) {
+                this.dScore = this.calcScore(this.dCards);
+                dHTML = this.dCards.map(c => this.renderCard(c)).join('');
+                document.getElementById('dealer-score').innerText = this.dScore;
+            } else {
+                dHTML = this.renderCard(this.dCards[0]) + this.renderCard(null, true);
+                document.getElementById('dealer-score').innerText = this.dCards[0].weight;
+            }
+            document.getElementById('dealer-cards').innerHTML = dHTML;
+
+            if(this.pScore > 21) this.endGame("Przegrałeś (Fura)", 0);
+        },
+
+        hit() {
+            if(this.state !== 'playing') return;
+            this.pCards.push(this.drawCard());
+            sfx.play('card');
+            this.updateBoard();
+        },
+
+        stand() {
+            if(this.state !== 'playing') return;
+            this.state = 'dealerTurn';
+            this.toggleBtns(false);
+            
+            let dScore = this.calcScore(this.dCards);
+            const dealerDraw = setInterval(() => {
+                if(dScore < 17) {
+                    this.dCards.push(this.drawCard());
+                    dScore = this.calcScore(this.dCards);
+                    sfx.play('card');
+                    this.updateBoard(true);
+                } else {
+                    clearInterval(dealerDraw);
+                    this.finalizeGame();
+                }
+            }, 800);
+            
+            this.updateBoard(true);
+        },
+
+        finalizeGame() {
+            this.dScore = this.calcScore(this.dCards);
+            if(this.dScore > 21 || this.pScore > this.dScore) {
+                this.endGame("Wygrałeś!", this.bet * 2);
+            } else if(this.pScore === this.dScore) {
+                this.endGame("Remis (Zwrot)", this.bet);
+            } else {
+                this.endGame("Krupier wygrywa", 0);
+            }
+        },
+
+        endGame(msg, payout) {
+            this.state = 'idle';
+            this.toggleBtns(false);
+            if(payout > 0) {
+                app.balance += payout;
+                app.notify(`Blackjack: ${msg} (+${payout}$)`);
+            } else {
+                app.notify(`Blackjack: ${msg}`, "error");
+            }
+            app.updateUI();
+        },
+
+        toggleBtns(play) {
+            document.getElementById('bj-hit').disabled = !play;
+            document.getElementById('bj-stand').disabled = !play;
+            document.getElementById('bj-start').disabled = play;
+            document.getElementById('bj-start').innerText = play ? "Gra Trwa..." : "Nowa Gra (100$)";
+        }
+    }
+};
+
+window.onload = () => { app.init(); };
