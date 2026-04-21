@@ -21,8 +21,7 @@ const app = {
     validUsers: {
         "vlad": { name: "Vlad Kelman", pass: "123123", startBalance: 5000, role: "Admin" },
         "margo":  { name: "Menja zawut Margo", pass: "margo123", startBalance: 5000, role: "Admin" },
-        "roman": { name: "Roman", pass: "3,14159", startBalance: 5000, role: "Nauczyciel" },
-        "seba": { name: "Sebastian", pass: "seba123", startBalance: 500000, role: "VIP Tester" }
+        "roman": { name: "Roman", pass: "3,14159", startBalance: 5000, role: "VIP Tester" }
     },
 
     // Рабочие промокоды
@@ -210,10 +209,10 @@ const app = {
         if(bonusClaimed) {
             this.notify("Już odebrałeś swój bonus powitalny!", "error");
         } else {
-            this.balance += 7777;
+            this.balance += 200;
             localStorage.setItem(`bonus_${this.user}`, "true");
             this.updateUI();
-            this.notify("Sukces! Dodano 7777$ bonusu powitalnego do twojego salda.", "success");
+            this.notify("Sukces! Dodano 200$ bonusu powitalnego do twojego salda.", "success");
         }
     },
 
